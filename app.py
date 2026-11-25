@@ -8,6 +8,7 @@ import tempfile
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+from tkinter import font as tkfont
 
 from tkinterdnd2 import DND_FILES, TkinterDnD  # ドラッグ＆ドロップを受け取るための追加の部品
 
@@ -17,6 +18,18 @@ VIDEO_EXTS = (".mp4",)
 IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".webp")
 
 PREVIEW_W, PREVIEW_H = 320, 180
+
+# ---- 色と文字（ここを変えると、画面全体の見た目が変わる） ----
+BG = "#f3f5f4"           # 画面の背景（薄い灰色）
+CARD = "#ffffff"         # カードの背景（白）
+BORDER = "#dce3e1"       # カードや入力欄の枠
+GREEN = "#14796f"        # 差し色（ポートフォリオの緑に合わせた）
+GREEN_DARK = "#0f5f57"   # ボタンを押したときの緑
+GREEN_LIGHT = "#e4f1ee"  # 表の見出し・ボタンに乗ったときの薄い緑
+TEXT = "#1f2a30"         # ふつうの文字
+SUB = "#6b7780"          # 補足の文字（薄い灰色）
+FONT = "Yu Gothic UI"
+
 MSG_NO_VIDEO = "MP4 を「追加」してください"
 MSG_NO_IMAGE = "サムネイルにする画像を選んでください"
 MSG_READY = "準備ができました。「サムネイルを変える」を押してください"
@@ -122,21 +135,107 @@ class App(TkinterDnD.Tk):
             self.status.set("。".join(parts))
         return event.action
 
+    # ---------- 見た目の決まり ----------
+    def _setup_style(self):
+        """ttk（tkinter の部品）の色・文字・形を、アプリ全体でまとめて決める。"""
+        self.configure(bg=BG)
+        for name in ("TkDefaultFont", "TkTextFont", "TkHeadingFont", "TkMenuFont"):
+            tkfont.nametofont(name).configure(family=FONT, size=10)
+        s = ttk.Style(self)
+        s.theme_use("clam")  # 色を自由に変えやすい形
+        s.configure(".", background=BG, foreground=TEXT, font=(FONT, 10),
+                    bordercolor=BORDER, lightcolor=CARD, darkcolor=BORDER, focuscolor=GREEN)
+        s.configure("TFrame", background=BG)
+        s.configure("Card.TFrame", background=CARD)
+        s.configure("TLabel", background=BG)
+        s.configure("Card.TLabel", background=CARD)
+        s.configure("CardTitle.TLabel", background=CARD, font=(FONT, 12, "bold"))
+        s.configure("Sub.TLabel", background=CARD, foreground=SUB, font=(FONT, 9))
+        s.configure("Status.TLabel", background=BG, foreground=SUB, font=(FONT, 10))
+
+        # ふつうのボタン：白地に枠線
+        s.configure("TButton", background=CARD, foreground=TEXT, padding=(14, 5), relief="raised", width=-4,
+                    borderwidth=1, bordercolor="#c3ccca", lightcolor=CARD, darkcolor=CARD)
+        s.map("TButton", background=[("disabled", BG), ("pressed", GREEN_LIGHT), ("active", GREEN_LIGHT)],
+              foreground=[("disabled", "#a9b3b8")], bordercolor=[("active", GREEN)])
+        # 実行ボタン：大きな緑
+        s.configure("Accent.TButton", background=GREEN, foreground="#ffffff", font=(FONT, 12, "bold"),
+                    padding=(30, 10), bordercolor=GREEN, lightcolor=GREEN, darkcolor=GREEN)
+        s.map("Accent.TButton",
+              background=[("disabled", "#c5cfcd"), ("pressed", GREEN_DARK), ("active", GREEN_DARK)],
+              foreground=[("disabled", "#ffffff")],
+              bordercolor=[("disabled", "#c5cfcd"), ("active", GREEN_DARK)],
+              lightcolor=[("disabled", "#c5cfcd"), ("active", GREEN_DARK)],
+              darkcolor=[("disabled", "#c5cfcd"), ("active", GREEN_DARK)])
+
+        # 一覧の表：行を広く、見出しは薄い緑
+        s.configure("Treeview", background=CARD, fieldbackground=CARD, foreground=TEXT,
+                    rowheight=28, bordercolor=BORDER, lightcolor=CARD, darkcolor=CARD)
+        s.map("Treeview", background=[("selected", GREEN_LIGHT)], foreground=[("selected", TEXT)])
+        s.configure("Treeview.Heading", background=GREEN_LIGHT, foreground=GREEN_DARK,
+                    font=(FONT, 10, "bold"), relief="flat", padding=(6, 5), bordercolor=GREEN_LIGHT)
+        s.map("Treeview.Heading", background=[("active", GREEN_LIGHT)])
+
+        # タブ：選んでいるタブは白地に緑の太字＋上に緑の線
+        s.configure("TNotebook", background=CARD, bordercolor=BORDER, tabmargins=(0, 0, 0, 0))
+        s.configure("TNotebook.Tab", background=BG, foreground=SUB, padding=(16, 7),
+                    bordercolor=BORDER, lightcolor=BG, font=(FONT, 10))
+        s.map("TNotebook.Tab",
+              background=[("selected", CARD)], foreground=[("selected", GREEN)],
+              lightcolor=[("selected", GREEN)], font=[("selected", (FONT, 10, "bold"))],
+              expand=[("selected", (0, 2, 0, 0))])
+
+        # 入力欄・丸ボタン・スライダー
+        s.configure("TEntry", fieldbackground=CARD, bordercolor=BORDER, lightcolor=CARD, padding=(6, 4))
+        s.map("TEntry", bordercolor=[("focus", GREEN)], fieldbackground=[("readonly", "#f7f9f8")])
+        s.configure("TRadiobutton", background=CARD, foreground=TEXT, indicatorbackground=CARD,
+                    indicatorforeground=GREEN, indicatormargin=(0, 0, 8, 0), padding=(0, 3))
+        s.map("TRadiobutton", background=[("active", CARD)], indicatorbackground=[("selected", CARD)])
+        s.configure("Horizontal.TScale", background=GREEN, troughcolor="#e3eae8", bordercolor="#e3eae8",
+                    lightcolor=GREEN, darkcolor=GREEN, sliderthickness=12, sliderlength=18, gripcount=0)
+        s.map("Horizontal.TScale", background=[("active", GREEN_DARK)])
+        for name in ("TScrollbar", "Vertical.TScrollbar"):
+            s.configure(name, background="#d6dfdd", troughcolor=CARD, bordercolor=CARD,
+                        arrowcolor=SUB, lightcolor="#d6dfdd", darkcolor="#d6dfdd", gripcount=0, arrowsize=12)
+            s.map(name, background=[("active", "#b9c6c3")])
+
+    def _card(self, parent, row, title, hint=None):
+        """白いカードを作り、見出しを付けて、中身を入れる枠を返す。"""
+        card = tk.Frame(parent, bg=CARD, highlightbackground=BORDER, highlightthickness=1, padx=16, pady=12)
+        card.grid(row=row, column=0, sticky="we", pady=(0, 12))
+        head = ttk.Frame(card, style="Card.TFrame")
+        head.pack(fill="x", pady=(0, 8))
+        ttk.Label(head, text=title, style="CardTitle.TLabel").pack(side="left")
+        if hint:
+            ttk.Label(head, text=hint, style="Sub.TLabel").pack(side="left", padx=(10, 0), pady=(3, 0))
+        body = ttk.Frame(card, style="Card.TFrame")
+        body.pack(fill="x")
+        return body
+
     # ---------- 画面づくり ----------
     def _build(self):
-        pad = {"padx": 10, "pady": 5}
-        f = ttk.Frame(self, padding=10)
-        f.grid()
+        self._setup_style()
 
-        # 動画の一覧
-        lf = ttk.LabelFrame(f, text="動画（MP4）", padding=5)
-        lf.grid(row=0, column=0, columnspan=3, sticky="we", **pad)
+        # 上の帯：アプリ名と一言
+        header = tk.Frame(self, bg=GREEN, padx=20, pady=14)
+        header.grid(row=0, column=0, sticky="we")
+        tk.Label(header, text="MP4サムネイル変更", bg=GREEN, fg="#ffffff",
+                 font=(FONT, 16, "bold")).pack(anchor="w")
+        tk.Label(header, text="エクスプローラーで見える MP4 の絵を、好きな画像や場面に変えます",
+                 bg=GREEN, fg="#d5ece8", font=(FONT, 10)).pack(anchor="w")
+
+        f = ttk.Frame(self, padding=(16, 16, 16, 10))
+        f.grid(row=1, column=0, sticky="we")
+        f.columnconfigure(0, weight=1)
+
+        # 1. 動画の一覧
+        lf = self._card(f, 0, "1. 動画を入れる", "ドラッグ＆ドロップでも入れられます（フォルダも可）")
         self.tree = ttk.Treeview(lf, columns=("name", "result"), show="headings", height=5, selectmode="browse")
-        self.tree.heading("name", text="ファイル名")
-        self.tree.heading("result", text="結果")
+        self.tree.heading("name", text="ファイル名", anchor="w")
+        self.tree.heading("result", text="結果", anchor="w")
         self.tree.column("name", width=300)
-        self.tree.column("result", width=230)
-        self.tree.grid(row=0, column=0, columnspan=3)
+        self.tree.column("result", width=250)
+        self.tree.grid(row=0, column=0, columnspan=3, sticky="we")
         sb = ttk.Scrollbar(lf, orient="vertical", command=self.tree.yview)
         sb.grid(row=0, column=3, sticky="ns")
         self.tree.configure(yscrollcommand=sb.set)
@@ -144,66 +243,73 @@ class App(TkinterDnD.Tk):
         self.tree.tag_configure("ok", foreground="#1a7f37")
         self.tree.tag_configure("skip", foreground="#9a6700")
         self.tree.tag_configure("error", foreground="#cf222e")
-        self.add_btn = ttk.Button(lf, text="追加…", command=self._choose_videos)
-        self.add_btn.grid(row=1, column=0, sticky="w", pady=(5, 0))
-        self.remove_btn = ttk.Button(lf, text="一覧から外す", command=self._remove_selected)
-        self.remove_btn.grid(row=1, column=1, pady=(5, 0))
-        self.clear_btn = ttk.Button(lf, text="全部外す", command=self._clear_videos)
-        self.clear_btn.grid(row=1, column=2, sticky="e", pady=(5, 0))
+        self.add_btn = ttk.Button(lf, text="＋ 追加…", command=self._choose_videos)
+        self.add_btn.grid(row=1, column=0, sticky="w", pady=(10, 0))
+        btns = ttk.Frame(lf, style="Card.TFrame")
+        btns.grid(row=1, column=1, columnspan=3, sticky="e", pady=(10, 0))
+        self.remove_btn = ttk.Button(btns, text="一覧から外す", command=self._remove_selected)
+        self.remove_btn.pack(side="left", padx=(0, 6))
+        self.clear_btn = ttk.Button(btns, text="全部外す", command=self._clear_videos)
+        self.clear_btn.pack(side="left")
+        lf.columnconfigure(1, weight=1)
 
-        # サムネイルにするもの：タブで切りかえる（どちらの使い方もあると、ひと目で分かるように）
-        ttk.Label(f, text="サムネイルにするもの（一覧の全部の動画に使います）").grid(
-            row=1, column=0, columnspan=3, sticky="w", padx=10, pady=(5, 0))
-        self.tabs = ttk.Notebook(f)
-        self.tabs.grid(row=2, column=0, columnspan=3, sticky="we", **pad)
+        # 2. サムネイルにするもの：タブで切りかえる（どちらの使い方もあると、ひと目で分かるように）
+        sf = self._card(f, 1, "2. サムネイルにするもの", "一覧の全部の動画に使います")
+        self.tabs = ttk.Notebook(sf)
+        self.tabs.pack(fill="x")
 
         # 画像ファイルのタブ
-        self.image_row = ttk.Frame(self.tabs, padding=5)
-        self.tabs.add(self.image_row, text="　画像ファイル　")
-        ttk.Label(self.image_row, text="サムネイル画像").grid(row=0, column=0, sticky="w", **pad)
-        ttk.Entry(self.image_row, textvariable=self.image_path, width=52, state="readonly").grid(row=0, column=1, **pad)
-        ttk.Button(self.image_row, text="選ぶ…", command=self._choose_image).grid(row=0, column=2, **pad)
+        self.image_row = ttk.Frame(self.tabs, style="Card.TFrame", padding=(4, 12, 4, 6))
+        self.tabs.add(self.image_row, text="画像ファイル")
+        ttk.Label(self.image_row, text="サムネイル画像", style="Card.TLabel").grid(row=0, column=0, sticky="w", padx=(0, 10))
+        ttk.Entry(self.image_row, textvariable=self.image_path, width=46, state="readonly").grid(row=0, column=1, sticky="we")
+        ttk.Button(self.image_row, text="選ぶ…", command=self._choose_image).grid(row=0, column=2, padx=(8, 0))
+        ttk.Label(self.image_row, text="JPG・PNG・BMP・WebP（画像を画面に落としても選べます）",
+                  style="Sub.TLabel").grid(row=1, column=1, sticky="w", pady=(4, 0))
+        self.image_row.columnconfigure(1, weight=1)
 
         # 動画の場面のタブ（スライダーと時間の入力欄）
-        self.scene_row = ttk.Frame(self.tabs, padding=5)
-        self.tabs.add(self.scene_row, text="　動画の場面（スライダー・時間指定）　")
+        self.scene_row = ttk.Frame(self.tabs, style="Card.TFrame", padding=(4, 12, 4, 6))
+        self.tabs.add(self.scene_row, text="動画の場面（スライダー・時間指定）")
         self.tabs.bind("<<NotebookTabChanged>>", lambda e: self._on_tab_changed())
-        ttk.Label(self.scene_row, text="場面の時間").grid(row=0, column=0, sticky="w", **pad)
-        self.slider = ttk.Scale(self.scene_row, from_=0, to=1, length=340, command=self._on_slider)
-        self.slider.grid(row=0, column=1, **pad)
-        self.time_entry = ttk.Entry(self.scene_row, textvariable=self.time_text, width=9, justify="center")
-        self.time_entry.grid(row=0, column=2, padx=(10, 2))
+        ttk.Label(self.scene_row, text="場面の時間", style="Card.TLabel").grid(row=0, column=0, sticky="w", padx=(0, 10))
+        self.slider = ttk.Scale(self.scene_row, from_=0, to=1, length=330, command=self._on_slider)
+        self.slider.grid(row=0, column=1, sticky="we")
+        self.time_entry = ttk.Entry(self.scene_row, textvariable=self.time_text, width=8, justify="center")
+        self.time_entry.grid(row=0, column=2, padx=(12, 6))
         self.time_entry.bind("<Return>", lambda e: self._on_time_entry())
-        ttk.Button(self.scene_row, text="表示", width=5, command=self._on_time_entry).grid(row=0, column=3)
-        self.length_label = ttk.Label(self.scene_row, text="（動画を追加すると動かせます）", foreground="#666")
-        self.length_label.grid(row=1, column=1, sticky="w", padx=10)
+        ttk.Button(self.scene_row, text="表示", command=self._on_time_entry).grid(row=0, column=3)
+        self.length_label = ttk.Label(self.scene_row, text="動画を入れると動かせます", style="Sub.TLabel")
+        self.length_label.grid(row=1, column=1, columnspan=3, sticky="w", pady=(4, 0))
+        self.scene_row.columnconfigure(1, weight=1)
 
         # 見本の絵を出す場所（大きさを固定して、絵がなくても画面がガタつかないように）
-        box = tk.Frame(f, width=PREVIEW_W, height=PREVIEW_H, bg="#ddd")
-        box.grid(row=3, column=0, columnspan=3, **pad)
+        box = tk.Frame(sf, width=PREVIEW_W, height=PREVIEW_H, bg="#eef2f1",
+                       highlightbackground=BORDER, highlightthickness=1)
+        box.pack(pady=(12, 0))
         box.pack_propagate(False)
-        self.preview = tk.Label(box, bg="#ddd")
+        self.preview = tk.Label(box, bg="#eef2f1", fg=SUB, font=(FONT, 10))
         self.preview.pack(expand=True, fill="both")
 
-        mode = ttk.LabelFrame(f, text="保存のしかた", padding=5)
-        mode.grid(row=4, column=0, columnspan=3, sticky="we", **pad)
+        # 3. 保存のしかた
+        mode = self._card(f, 2, "3. 保存のしかた")
         ttk.Radiobutton(mode, text="別ファイルで保存（元の動画は残す。「名前_thumb.mp4」ができます）",
                         variable=self.save_mode, value="new").pack(anchor="w")
         ttk.Radiobutton(mode, text="上書き（元の動画そのものを変える）",
                         variable=self.save_mode, value="overwrite").pack(anchor="w")
 
-        self.run_btn = ttk.Button(f, text="サムネイルを変える", command=self._run)
-        self.run_btn.grid(row=5, column=0, columnspan=3, **pad)
-        ttk.Label(f, textvariable=self.status, foreground="#333").grid(row=6, column=0, columnspan=3, **pad)
+        self.run_btn = ttk.Button(f, text="サムネイルを変える", style="Accent.TButton", command=self._run)
+        self.run_btn.grid(row=3, column=0, sticky="we", pady=(2, 8))
+        ttk.Label(f, textvariable=self.status, style="Status.TLabel").grid(row=4, column=0)
 
     def _switch_source(self):
         """「画像ファイル」と「動画の場面」で、開くタブと見本を切りかえる。"""
         if self.source.get() == "image":
             tab = self.image_row
-            self._show_preview(self._image_preview, "（画像の見本）")
+            self._show_preview(self._image_preview, "画像を選ぶと、ここに見本が出ます")
         else:
             tab = self.scene_row
-            self._show_preview(self._scene_preview, "（場面の見本）")
+            self._show_preview(self._scene_preview, "動画を入れると、ここに場面が出ます")
         if self.tabs.select() != str(tab):
             self.tabs.select(tab)
         self._update_button()
@@ -275,12 +381,12 @@ class App(TkinterDnD.Tk):
         self._scene_preview = None
         if path is None:
             self.slider.configure(to=1)
-            self.length_label.configure(text="（動画を追加すると動かせます）")
+            self.length_label.configure(text="動画を入れると動かせます")
             self.slider.set(0)
             self.time_text.set(fmt_time(0))
             self.scene_sec = 0.0
             if self.source.get() == "scene":
-                self._show_preview(None, "（場面の見本）")
+                self._show_preview(None, "動画を入れると、ここに場面が出ます")
             return
         duration = self.videos[path]
         # 最後の瞬間は場面が取れないことがあるので、少し手前までにする
@@ -365,7 +471,7 @@ class App(TkinterDnD.Tk):
         if ok:
             self._scene_preview = tk.PhotoImage(file=png)
         if self.source.get() == "scene":
-            self._show_preview(self._scene_preview, "（この時間の場面は表示できません）")
+            self._show_preview(self._scene_preview, "この時間の場面は表示できません")
 
     # ---------- 実行 ----------
     def _ready(self):
